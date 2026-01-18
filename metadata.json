@@ -1,0 +1,7 @@
+{
+  "name": "InstaQ - AI Question Paper Generator",
+  "description": "An advanced educational tool for teachers to generate various types of questions (MCQ, Brief, Descriptive, etc.) from multiple book page images using Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
