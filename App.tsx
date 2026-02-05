@@ -189,7 +189,8 @@ const App: React.FC = () => {
       setHistory(prev => [newRes, ...prev]);
       triggerToast('ফলাফল জেনারেট হয়েছে');
     } catch (err: any) { 
-      triggerToast('জেনারেট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।'); 
+      console.error("Generation Error Details:", err);
+      triggerToast('জেনারেট করতে সমস্যা হয়েছে: ' + (err.message || 'Unknown Error')); 
     } finally { 
       setLoading(false); 
     }
@@ -239,6 +240,7 @@ const App: React.FC = () => {
         setHistory(prev => [newChatRes, ...prev]);
       }
     } catch (err: any) { 
+      console.error("Chat Error Details:", err);
       triggerToast('AI থেকে উত্তর পেতে সমস্যা হয়েছে'); 
     } finally { 
       setLoading(false); 
