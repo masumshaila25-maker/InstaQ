@@ -21,7 +21,18 @@ export enum SubjectType {
 export enum AppMode {
   GENERATE = 'GENERATE',
   SEARCH = 'SEARCH',
-  CHAT = 'CHAT'
+  CHAT = 'CHAT',
+  ADMIN = 'ADMIN',
+  PROFILE = 'PROFILE'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'admin';
+  joinedAt: string;
+  usageCount: number;
 }
 
 export interface QuestionConfig {
@@ -47,6 +58,7 @@ export interface ChatMessage {
 
 export interface GenerationResult {
   id: string;
+  userId: string;
   content: string;
   timestamp: string;
   imageCount: number;

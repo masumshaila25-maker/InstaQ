@@ -1,57 +1,82 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { QuestionType, QuestionRequest, FilePart, SubjectType } from "../types";
+import { QuestionRequest, FilePart, SubjectType } from "../types";
 
-const getSystemInstruction = (subject: SubjectType, mode: string): string => {
-  let instruction = `
-    তুমি একজন দক্ষ শিক্ষাবিদ এবং অল-ইন-ওয়ান স্টাডি অ্যাসিস্ট্যান্ট। 
-    প্রদত্ত ফাইল বা কন্টেন্ট নিখুঁতভাবে বিশ্লেষণ করো। 
-    ১. টেক্সট এর মাঝে কোনো প্রকার ** (ডাবল অ্যাস্টেরিস্ক) বা মার্কডাউন ফরম্যাটিং ব্যবহার করবে না। 
-    ২. উত্তরের সাথে প্রাসঙ্গিক হলে রেফারেন্স বা সূত্র উল্লেখ করবে। 
-    ৩. তথ্যগুলো শুদ্ধ বানানে লিখবে।
-  `;
-
-  if (subject === SubjectType.ENGLISH) {
-    instruction += `\nনির্দেশ: বিষয় ইংরেজি। গ্রামার বা টেক্সট সবকিছুর ব্যাখ্যা ইংরেজিতে দাও। Rules এবং Examples স্পষ্টভাবে তুলে ধরো।`;
-  } else if (subject === SubjectType.MATH) {
-    instruction += `\nনির্দেশ: বিষয় গণিত। যেকোনো সমস্যার সমাধান 'ধাপ অনুযায়ী' (Step-by-Step) করো। প্রতিটি ধাপের যুক্তি সংক্ষেপে লিখো।`;
-  } else if (subject === SubjectType.BENGALI) {
-    instruction += `\nনির্দেশ: বাংলা ব্যাকরণের ক্ষেত্রে (যেমন- কারক, সমাস, সন্ধি) নিয়ম এবং উদাহরণ স্পষ্টভাবে দাও।`;
-  } else if (subject === SubjectType.ISLAM) {
-    instruction += `\nনির্দেশ: ধর্মীয় তথ্যের ক্ষেত্রে কুরআন ও হাদিসের সঠিক রেফারেন্স ও নৈতিক শিক্ষা বজায় রাখবে।`;
+const getDynamicInstruction = (mode: string = "GENERAL", subject?: SubjectType): string => {
+  const adminConfig = localStorage.getItem('instaq_admin_config');
+  if (adminConfig) {
+    try {
+      const config = JSON.parse(adminConfig);
+      if (config.systemInstruction) return config.systemInstruction;
+    } catch (e) {
+      console.error("Admin config error", e);
+    }
   }
 
-  if (mode === 'CHAT') {
-    instruction += `\nতুমি এখন "জিজ্ঞাসা ও সমাধান" চ্যাট মোডে আছো। ব্যবহারকারীর যেকোনো সাধারণ প্রশ্ন, গণিত, বা গ্রামারের সমস্যার সমাধান দাও। যদি কোনো ফাইল আপলোড করা না থাকে, তবে তোমার বিশাল জ্ঞানভাণ্ডার থেকে সঠিক উত্তর দাও।`;
+  // Mandatory source referencing instruction
+  const referenceInstruction = `প্রতিটি উত্তর বা প্রশ্নের শেষে অবশ্যই রেফারেন্স হিসেবে বইয়ের পৃষ্ঠা নম্বর, অনুচ্ছেদ নম্বর এবং লাইন নম্বর উল্লেখ করবে। উদাহরণ: (সূত্র: পৃষ্ঠা-২৪, অনুচ্ছেদ-০২, লাইন-০৮)।`;
+
+  // Specific instruction for Math
+  if (subject === SubjectType.MATH) {
+    return `তুমি একজন গণিত বিশেষজ্ঞ। গণিত সমাধান করার সময় গাইড বইয়ের মতো হুবহু নিচের ফরম্যাটটি অনুসরণ করো:
+    ১. প্রথমে 'সমাধানঃ' লিখবে।
+    ২. তারপর 'দেওয়া আছেঃ' লিখে প্রশ্ন থেকে পাওয়া মানগুলো নিচে নিচে লিখবে।
+    ৩. এরপর 'আমরা জানি,' লিখে প্রয়োজনীয় সূত্রটি লিখবে।
+    ৪. সমাধান করার সময় 'ধাপ ১', 'ধাপ ২', 'ধাপ ৩' বা 'Step 1' এমন কোনো ক্রমিক লেবেল বা নম্বর একদমই ব্যবহার করবে না। কোনো ভূমিকা বা অতিরিক্ত ব্যাখ্যা ছাড়াই সরাসরি অংকটি করবে।
+    ৫. অংকের মধ্যে 'গুণ' বা 'ভাগ' শব্দগুলো না লিখে গাণিতিক চিহ্ন (যেমন: × এবং ÷) ব্যবহার করবে। 
+    ৬. প্রতিটি গাণিতিক ধাপ আলাদা আলাদা লাইনে নিচে নিচে লিখবে। অপ্রয়োজনীয় অতিরিক্ত ফাঁকা লাইন ব্যবহার করবে না।
+    ৭. সমান চিহ্নের (=) ব্যবহার এমন ভাবে করবে যেন সব ধাপ নিচে নিচে সুন্দর দেখায়।
+    ৮. উত্তরের শেষে অবশ্যই একক (যেমন: মিটার, বর্গমিটার, টাকা) উল্লেখ করবে।
+    ৯. শেষে তথ্যসূত্র প্রদান করবে: ${referenceInstruction}
+    ১০. কোনো মার্কডাউন (**, #) ব্যবহার করবে না। কন্টেন্ট ঘন বা কম্প্যাক্ট রাখবে।`;
   }
 
-  return instruction;
+  if (mode === 'CHAT' || mode === 'SEARCH') {
+    return `তুমি একজন বিশেষজ্ঞ শিক্ষক। তোমার উত্তরের ফরম্যাট নিচের মতো হতে হবে:
+    ১. সমাধানঃ উত্তরটি সরাসরি এবং যৌক্তিকভাবে সাজিয়ে দাও। কোনোভাবেই 'ধাপ ১', 'ধাপ ২' বা 'Step 1' জাতীয় লেবেল ব্যবহার করবে না। 
+    ২. তথ্যসূত্রঃ ${referenceInstruction}
+    ৩. স্টাইলঃ কোনো মার্কডাউন (যেমন **, #) ব্যবহার করবে না। 
+    ৪. প্রেজেন্টেশনঃ তথ্যগুলো আলাদা আলাদা লাইনে গাইড বইয়ের স্টাইলে সাজিয়ে লিখবে। লাইনের মাঝে অপ্রয়োজনীয় গ্যাপ বা ফাঁকা রাখবে না।`;
+  }
+
+  return `তুমি একজন দক্ষ প্রশ্নপত্র প্রস্তুতকারক। 
+  ১. রেফারেন্সঃ প্রতিটি প্রশ্নের শেষে (পৃষ্ঠা, অনুচ্ছেদ, লাইন) অবশ্যই ব্র্যাকেটে উল্লেখ করো।
+  ২. স্টাইলঃ টেক্সট এর মাঝে কোনো ** বা মার্কডাউন ফরম্যাটিং ব্যবহার করবে না। কোনো প্রকার 'ধাপ' বা 'স্টেপ' লেবেল ব্যবহার করবে না।
+  ৩. গঠনঃ বিষয়বস্তুগুলো মার্জিত ভাষায় আলাদা লাইনে লিখবে। অতিরিক্ত ফাঁকা লাইন বা প্যারাগ্রাফ গ্যাপ এড়িয়ে চলবে।`;
+};
+
+const incrementUsage = (userId: string) => {
+  const users = JSON.parse(localStorage.getItem('instaq_db_users') || '[]');
+  const updatedUsers = users.map((u: any) => {
+    if (u.id === userId) return { ...u, usageCount: (u.usageCount || 0) + 1 };
+    return u;
+  });
+  localStorage.setItem('instaq_db_users', JSON.stringify(updatedUsers));
 };
 
 export const generateQuestionsFromImages = async (
   files: FilePart[],
   request: QuestionRequest,
-  subject: SubjectType
+  subject: SubjectType,
+  customPrompt: string = "",
+  userId: string = "guest"
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const typesDetails = Object.entries(request)
     .filter(([_, config]) => config.enabled)
     .map(([key, config]) => `${key}: ${config.count}টি`)
     .join(', ');
 
   const prompt = `
-    ${getSystemInstruction(subject, 'GENERATE')}
-    তুমি এখন "${subject}" বিষয়ের প্রশ্নপত্র প্রণয়নকারী। 
-    অনুরোধকৃত প্রশ্নের তালিকা ও সংখ্যা: ${typesDetails}
-    নির্দেশ: প্রদত্ত কন্টেন্ট থেকে উপরের ধরণ অনুযায়ী প্রশ্ন ও উত্তর তৈরি করো। কোনো মার্কডাউন ব্যবহার করবে না।
+    ${getDynamicInstruction('GENERATE', subject)}
+    বিষয়: ${subject}
+    প্রশ্নের ধরণ: ${typesDetails}
+    ব্যবহারকারীর বিশেষ নির্দেশ: ${customPrompt || "বইয়ের তথ্য অনুযায়ী নিখুঁত প্রশ্ন ও উত্তর তৈরি করো।"}
+    বিশেষ নির্দেশ: ফাইল থেকে তথ্য নিয়ে প্রশ্ন ও উত্তর তৈরি করো। প্রতিটি প্রশ্নের শেষে অবশ্যই (পৃষ্ঠা-X, অনুচ্ছেদ-Y, লাইন-Z) রেফারেন্স দাও। মনে রাখবে, কোনো 'ধাপ ১', 'ধাপ ২' লেখা যাবে না এবং উত্তরের মাঝে মাত্রাতিরিক্ত ফাঁকা লাইন দেওয়া যাবে না।
   `;
 
   const parts = files.map(file => ({
-    inlineData: {
-      mimeType: file.mimeType,
-      data: file.data.split(',')[1] || file.data,
-    },
+    inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
   }));
 
   try {
@@ -59,10 +84,10 @@ export const generateQuestionsFromImages = async (
       model: 'gemini-3-flash-preview',
       contents: { parts: [...parts, { text: prompt }] },
     });
+    incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error) {
-    console.error('Error generating questions:', error);
-    throw new Error('AI থেকে রেসপন্স পেতে সমস্যা হয়েছে।');
+    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
   }
 };
 
@@ -70,26 +95,24 @@ export const solveAnyQuery = async (
   files: FilePart[],
   query: string,
   subject: SubjectType,
-  mode: string
+  mode: string,
+  userId: string = "guest"
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const systemPrompt = getDynamicInstruction(mode, subject);
   
   const prompt = `
-    ${getSystemInstruction(subject, mode)}
-    বিষয়: "${subject}"
-    ব্যবহারকারীর প্রশ্ন/সমস্যা: "${query}"
-    
-    নির্দেশ: যদি ফাইল থাকে তবে ফাইল থেকে উত্তর দাও, নতুবা তোমার বুদ্ধিমত্তা ব্যবহার করে গণিত হলে সমাধান, গ্রামার হলে ব্যাখ্যাসহ উত্তর দাও। কোনো মার্কডাউন ব্যবহার করবে না।
+    ${systemPrompt}
+    বিষয়: ${subject}
+    ব্যবহারকারীর জিজ্ঞাসা: "${query}"
+    নির্দেশ: উত্তরটি রেফারেন্স (পৃষ্ঠা, অনুচ্ছেদ, লাইন) সহ নিখুঁতভাবে তৈরি করো। কোনো 'ধাপ ১', 'ধাপ ২' ব্যবহার করবে না এবং লাইনের মাঝে অতিরিক্ত স্পেস বা গ্যাপ দেবে না।
   `;
 
   const parts: any[] = [];
   if (files && files.length > 0) {
     files.forEach(file => {
       parts.push({
-        inlineData: {
-          mimeType: file.mimeType,
-          data: file.data.split(',')[1] || file.data,
-        },
+        inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
       });
     });
   }
@@ -100,37 +123,10 @@ export const solveAnyQuery = async (
       model: 'gemini-3-flash-preview',
       contents: { parts },
     });
+    incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error) {
-    console.error('Error solving query:', error);
-    throw new Error('সমাধান পেতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-  }
-};
-
-export const refineQuestions = async (
-  currentContent: string,
-  userInstruction: string
-): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `
-    বর্তমান কন্টেন্ট:
-    """
-    ${currentContent}
-    """
-    ব্যবহারকারীর নতুন নির্দেশনা: "${userInstruction}"
-    নির্দেশ: উপরের নির্দেশনা অনুযায়ী কন্টেন্টটি সংশোধন বা পরিবর্তন করো। কোনো মার্কডাউন ব্যবহার করবে না।
-  `;
-
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return cleanResponse(response.text || '');
-  } catch (error) {
-    console.error('Error refining:', error);
-    throw new Error('সংশোধন করতে সমস্যা হয়েছে।');
+    throw new Error('সমাধান জেনারেট করা সম্ভব হয়নি।');
   }
 };
 
@@ -140,6 +136,11 @@ const cleanResponse = (text: string): string => {
     .replace(/###/g, '')   
     .replace(/##/g, '')    
     .replace(/#/g, '')     
-    .replace(/^- /gm, '')
+    .replace(/ধাপ\s*[০-৯0-9]+\s*[:।-]\s*/gi, '') 
+    .replace(/Step\s*[0-9]+\s*[:।-]\s*/gi, '')   
+    .replace(/\r/g, '') // Remove carriage returns
+    .replace(/\n{3,}/g, '\n\n') // Collapse 3 or more newlines into just 2
+    .replace(/^\s+$/gm, '') // Remove whitespace from empty lines
+    .replace(/\*/g, '×') 
     .trim();
 };

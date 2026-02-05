@@ -6,99 +6,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InstaQ - AI Question Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Added crossorigin="anonymous" to resolve CSS access issues for html-to-image -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
     <style>
         :root {
             --primary: #4f46e5;
-            --primary-light: #818cf8;
-            --bg-main: #fcfcfd;
+            --primary-hover: #4338ca;
+            --bg-main: #f8fafc;
         }
         body {
             font-family: 'Hind Siliguri', sans-serif;
             background-color: var(--bg-main);
             color: #1e293b;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
         
-        .content-area {
-            font-family: 'Hind Siliguri', sans-serif !important;
-        }
-
-        .paper-card {
-            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 15px -3px rgba(0, 0, 0, 0.02);
-            border: 1px solid rgba(0, 0, 0, 0.03);
-        }
         .glass {
-            background: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(241, 245, 249, 0.5);
         }
-        @keyframes entry {
-            from { opacity: 0; transform: translateY(10px); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-entry { animation: entry 0.4s ease-out forwards; }
+        .animate-entry { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        .animate-shake { animation: shake 0.3s ease-in-out infinite; }
-
-        .tracking-tight { letter-spacing: -0.015em; }
-
-        /* Watermark styling - Optimized for both display and export */
         .watermarked {
             position: relative;
-            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='rgba(0,0,0,0.025)' font-size='22' font-family='Arial, sans-serif' font-weight='bold' transform='rotate(-45, 100, 100)'%3EInstaQ%3C/text%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg width='160' height='160' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='rgba(79, 70, 229, 0.02)' font-size='20' font-family='Arial, sans-serif' font-weight='bold' transform='rotate(-45, 100, 100)'%3EInstaQ AI%3C/text%3E%3C/svg%3E");
             background-repeat: repeat;
         }
 
-        /* Print Specific Styles */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            .print-section, .print-section * {
-                visibility: visible;
-            }
-            .print-section {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 20px;
-                background: white !important;
-                color: black !important;
-            }
-            .no-print {
-                display: none !important;
-            }
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* Fixed Export Container Styling for html-to-image */
+        #export-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 800px;
+            z-index: -100;
+            opacity: 0;
+            pointer-events: none;
+            background: white;
+            padding: 80px;
+            font-family: 'Hind Siliguri', sans-serif;
+            color: #000000;
+            line-height: 1.8;
+            font-size: 18px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 100px;
+        }
+
+        /* Card styles */
+        .modern-card {
+            background: white;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modern-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            border-color: #e2e8f0;
+        }
+
+        .input-focus:focus-within {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
         }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "html-to-image": "https://esm.sh/html-to-image@^1.11.13",
+    "jspdf": "https://esm.sh/jspdf@^2.5.1",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "html-to-image": "https://esm.sh/html-to-image@^1.11.11"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
 <body>
     <div id="root"></div>
+    <!-- Hidden container for exporting content -->
+    <div id="export-container"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
