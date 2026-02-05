@@ -13,10 +13,8 @@ const getDynamicInstruction = (mode: string = "GENERAL", subject?: SubjectType):
     }
   }
 
-  // Mandatory source referencing instruction
   const referenceInstruction = `প্রতিটি উত্তর বা প্রশ্নের শেষে অবশ্যই রেফারেন্স হিসেবে বইয়ের পৃষ্ঠা নম্বর, অনুচ্ছেদ নম্বর এবং লাইন নম্বর উল্লেখ করবে। উদাহরণ: (সূত্র: পৃষ্ঠা-২৪, অনুচ্ছেদ-০২, লাইন-০৮)।`;
 
-  // Specific instruction for Math
   if (subject === SubjectType.MATH) {
     return `তুমি একজন গণিত বিশেষজ্ঞ। গণিত সমাধান করার সময় গাইড বইয়ের মতো হুবহু নিচের ফরম্যাটটি অনুসরণ করো:
     ১. প্রথমে 'সমাধানঃ' লিখবে।
@@ -61,6 +59,11 @@ export const generateQuestionsFromImages = async (
   customPrompt: string = "",
   userId: string = "guest"
 ): Promise<string> => {
+  if (!process.env.API_KEY) {
+    console.error("Gemini API Key missing! Set API_KEY in environment.");
+    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const typesDetails = Object.entries(request)
     .filter(([_, config]) => config.enabled)
@@ -86,8 +89,9 @@ export const generateQuestionsFromImages = async (
     });
     incrementUsage(userId);
     return cleanResponse(response.text || '');
-  } catch (error) {
-    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
+  } catch (error: any) {
+    console.error("Gemini Generation Error:", error);
+    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে: ' + (error.message || 'Unknown error'));
   }
 };
 
@@ -98,6 +102,11 @@ export const solveAnyQuery = async (
   mode: string,
   userId: string = "guest"
 ): Promise<string> => {
+  if (!process.env.API_KEY) {
+    console.error("Gemini API Key missing!");
+    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const systemPrompt = getDynamicInstruction(mode, subject);
   
@@ -125,8 +134,9 @@ export const solveAnyQuery = async (
     });
     incrementUsage(userId);
     return cleanResponse(response.text || '');
-  } catch (error) {
-    throw new Error('সমাধান জেনারেট করা সম্ভব হয়নি।');
+  } catch (error: any) {
+    console.error("Gemini Solve Error:", error);
+    throw new Error('সমাধান জেনারেট করা সম্ভব হয়নি: ' + (error.message || 'Unknown error'));
   }
 };
 
@@ -138,9 +148,9 @@ const cleanResponse = (text: string): string => {
     .replace(/#/g, '')     
     .replace(/ধাপ\s*[০-৯0-9]+\s*[:।-]\s*/gi, '') 
     .replace(/Step\s*[0-9]+\s*[:।-]\s*/gi, '')   
-    .replace(/\r/g, '') // Remove carriage returns
-    .replace(/\n{3,}/g, '\n\n') // Collapse 3 or more newlines into just 2
-    .replace(/^\s+$/gm, '') // Remove whitespace from empty lines
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n') 
+    .replace(/^\s+$/gm, '') 
     .replace(/\*/g, '×') 
     .trim();
 };
