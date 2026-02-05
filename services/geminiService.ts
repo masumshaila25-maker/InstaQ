@@ -59,12 +59,9 @@ export const generateQuestionsFromImages = async (
   customPrompt: string = "",
   userId: string = "guest"
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.error("Gemini API Key missing! Set API_KEY in environment.");
-    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
-  }
-
+  // Always use direct process.env.API_KEY when initializing the GoogleGenAI client instance
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   const typesDetails = Object.entries(request)
     .filter(([_, config]) => config.enabled)
     .map(([key, config]) => `${key}: ${config.count}টি`)
@@ -82,12 +79,18 @@ export const generateQuestionsFromImages = async (
     inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
   }));
 
+  // Select model based on task complexity (Math and Science subjects use the Pro model)
+  const modelName = (subject === SubjectType.MATH || subject === SubjectType.SCIENCE) 
+    ? 'gemini-3-pro-preview' 
+    : 'gemini-3-flash-preview';
+
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       contents: { parts: [...parts, { text: prompt }] },
     });
     incrementUsage(userId);
+    // Access generated text directly via the .text property
     return cleanResponse(response.text || '');
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
@@ -102,12 +105,9 @@ export const solveAnyQuery = async (
   mode: string,
   userId: string = "guest"
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.error("Gemini API Key missing!");
-    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
-  }
-
+  // Always use direct process.env.API_KEY when initializing the GoogleGenAI client instance
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const systemPrompt = getDynamicInstruction(mode, subject);
   
   const prompt = `
@@ -127,12 +127,18 @@ export const solveAnyQuery = async (
   }
   parts.push({ text: prompt });
 
+  // Select model based on task complexity (Math and Science subjects use the Pro model)
+  const modelName = (subject === SubjectType.MATH || subject === SubjectType.SCIENCE) 
+    ? 'gemini-3-pro-preview' 
+    : 'gemini-3-flash-preview';
+
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       contents: { parts },
     });
     incrementUsage(userId);
+    // Access generated text directly via the .text property
     return cleanResponse(response.text || '');
   } catch (error: any) {
     console.error("Gemini Solve Error:", error);
