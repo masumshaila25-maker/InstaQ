@@ -1,4 +1,4 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { QuestionRequest, FilePart, SubjectType } from "../types";
 
 const getDynamicInstruction = (mode: string = "GENERAL", subject?: SubjectType): string => {
@@ -55,9 +55,8 @@ export const generateQuestionsFromImages = async (
   customPrompt: string = "",
   userId: string = "guest"
 ): Promise<string> => {
-  // এপিআই কি সরাসরি process.env থেকে নেওয়া হচ্ছে যা Vite দ্বারা ইনজেক্ট করা
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error('API Key missing. Please check Vercel settings.');
+  if (!apiKey) throw new Error('API Key missing. Please ensure API_KEY is set in Vercel environment variables.');
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -75,7 +74,10 @@ export const generateQuestionsFromImages = async (
   `;
 
   const parts = files.map(file => ({
-    inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
+    inlineData: { 
+      mimeType: file.mimeType, 
+      data: file.data.includes(',') ? file.data.split(',')[1] : file.data 
+    },
   }));
 
   const modelName = (subject === SubjectType.MATH || subject === SubjectType.SCIENCE) 
@@ -83,15 +85,16 @@ export const generateQuestionsFromImages = async (
     : 'gemini-3-flash-preview';
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: modelName,
-      contents: { parts: [...parts, { text: prompt }] },
+      contents: [{ parts: [...parts, { text: prompt }] }],
     });
+    
     incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error: any) {
-    console.error("Generation Error:", error);
-    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
+    console.error("Gemini API Error:", error);
+    throw new Error(error.message || 'AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
   }
 };
 
@@ -119,7 +122,10 @@ export const solveAnyQuery = async (
   if (files && files.length > 0) {
     files.forEach(file => {
       parts.push({
-        inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
+        inlineData: { 
+          mimeType: file.mimeType, 
+          data: file.data.includes(',') ? file.data.split(',')[1] : file.data 
+        },
       });
     });
   }
@@ -130,14 +136,15 @@ export const solveAnyQuery = async (
     : 'gemini-3-flash-preview';
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: modelName,
-      contents: { parts },
+      contents: [{ parts }],
     });
+    
     incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error: any) {
-    console.error("Solve Error:", error);
+    console.error("Gemini API Error:", error);
     throw new Error('সমাধান পাওয়া যায়নি।');
   }
 };
