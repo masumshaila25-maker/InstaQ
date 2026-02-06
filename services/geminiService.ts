@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { QuestionRequest, FilePart, SubjectType } from "../types";
 
@@ -20,27 +19,24 @@ const getDynamicInstruction = (mode: string = "GENERAL", subject?: SubjectType):
     ১. প্রথমে 'সমাধানঃ' লিখবে।
     ২. তারপর 'দেওয়া আছেঃ' লিখে প্রশ্ন থেকে পাওয়া মানগুলো নিচে নিচে লিখবে।
     ৩. এরপর 'আমরা জানি,' লিখে প্রয়োজনীয় সূত্রটি লিখবে।
-    ৪. সমাধান করার সময় 'ধাপ ১', 'ধাপ ২', 'ধাপ ৩' বা 'Step 1' এমন কোনো ক্রমিক লেবেল বা নম্বর একদমই ব্যবহার করবে না। কোনো ভূমিকা বা অতিরিক্ত ব্যাখ্যা ছাড়াই সরাসরি অংকটি করবে।
+    ৪. সমাধান করার সময় 'ধাপ ১', 'ধাপ ২', 'ধাপ ৩' বা 'Step 1' এমন কোনো ক্রমিক লেবেল বা নম্বর একদমই ব্যবহার করবে না। সরাসরি অংকটি করবে।
     ৫. অংকের মধ্যে 'গুণ' বা 'ভাগ' শব্দগুলো না লিখে গাণিতিক চিহ্ন (যেমন: × এবং ÷) ব্যবহার করবে। 
-    ৬. প্রতিটি গাণিতিক ধাপ আলাদা আলাদা লাইনে নিচে নিচে লিখবে। অপ্রয়োজনীয় অতিরিক্ত ফাঁকা লাইন ব্যবহার করবে না।
-    ৭. সমান চিহ্নের (=) ব্যবহার এমন ভাবে করবে যেন সব ধাপ নিচে নিচে সুন্দর দেখায়।
-    ৮. উত্তরের শেষে অবশ্যই একক (যেমন: মিটার, বর্গমিটার, টাকা) উল্লেখ করবে।
-    ৯. শেষে তথ্যসূত্র প্রদান করবে: ${referenceInstruction}
-    ১০. কোনো মার্কডাউন (**, #) ব্যবহার করবে না। কন্টেন্ট ঘন বা কম্প্যাক্ট রাখবে।`;
+    ৬. প্রতিটি গাণিতিক ধাপ আলাদা আলাদা লাইনে নিচে নিচে লিখবে।
+    ৭. উত্তরের শেষে অবশ্যই একক উল্লেখ করবে।
+    ৮. শেষে তথ্যসূত্র প্রদান করবে: ${referenceInstruction}`;
   }
 
   if (mode === 'CHAT' || mode === 'SEARCH') {
     return `তুমি একজন বিশেষজ্ঞ শিক্ষক। তোমার উত্তরের ফরম্যাট নিচের মতো হতে হবে:
     ১. সমাধানঃ উত্তরটি সরাসরি এবং যৌক্তিকভাবে সাজিয়ে দাও। কোনোভাবেই 'ধাপ ১', 'ধাপ ২' বা 'Step 1' জাতীয় লেবেল ব্যবহার করবে না। 
     ২. তথ্যসূত্রঃ ${referenceInstruction}
-    ৩. স্টাইলঃ কোনো মার্কডাউন (যেমন **, #) ব্যবহার করবে না। 
-    ৪. প্রেজেন্টেশনঃ তথ্যগুলো আলাদা আলাদা লাইনে গাইড বইয়ের স্টাইলে সাজিয়ে লিখবে। লাইনের মাঝে অপ্রয়োজনীয় গ্যাপ বা ফাঁকা রাখবে না।`;
+    ৩. স্টাইলঃ কোনো মার্কডাউন (যেমন **, #) ব্যবহার করবে না। কন্টেন্ট ঘন করে সাজিয়ে লিখবে।`;
   }
 
   return `তুমি একজন দক্ষ প্রশ্নপত্র প্রস্তুতকারক। 
   ১. রেফারেন্সঃ প্রতিটি প্রশ্নের শেষে (পৃষ্ঠা, অনুচ্ছেদ, লাইন) অবশ্যই ব্র্যাকেটে উল্লেখ করো।
   ২. স্টাইলঃ টেক্সট এর মাঝে কোনো ** বা মার্কডাউন ফরম্যাটিং ব্যবহার করবে না। কোনো প্রকার 'ধাপ' বা 'স্টেপ' লেবেল ব্যবহার করবে না।
-  ৩. গঠনঃ বিষয়বস্তুগুলো মার্জিত ভাষায় আলাদা লাইনে লিখবে। অতিরিক্ত ফাঁকা লাইন বা প্যারাগ্রাফ গ্যাপ এড়িয়ে চলবে।`;
+  ৩. গঠনঃ বিষয়বস্তুগুলো মার্জিত ভাষায় আলাদা লাইনে লিখবে।`;
 };
 
 const incrementUsage = (userId: string) => {
@@ -59,10 +55,9 @@ export const generateQuestionsFromImages = async (
   customPrompt: string = "",
   userId: string = "guest"
 ): Promise<string> => {
+  // এপিআই কি সরাসরি process.env থেকে নেওয়া হচ্ছে যা Vite দ্বারা ইনজেক্ট করা
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === '') {
-    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে Vercel ড্যাশবোর্ডের Settings > Environment Variables চেক করুন এবং রি-ডিপ্লয় করুন।');
-  }
+  if (!apiKey) throw new Error('API Key missing. Please check Vercel settings.');
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -76,7 +71,7 @@ export const generateQuestionsFromImages = async (
     বিষয়: ${subject}
     প্রশ্নের ধরণ: ${typesDetails}
     ব্যবহারকারীর বিশেষ নির্দেশ: ${customPrompt || "বইয়ের তথ্য অনুযায়ী নিখুঁত প্রশ্ন ও উত্তর তৈরি করো।"}
-    বিশেষ নির্দেশ: ফাইল থেকে তথ্য নিয়ে প্রশ্ন ও উত্তর তৈরি করো। প্রতিটি প্রশ্নের শেষে অবশ্যই (পৃষ্ঠা-X, অনুচ্ছেদ-Y, লাইন-Z) রেফারেন্স দাও। মনে রাখবে, কোনো 'ধাপ ১', 'ধাপ ২' লেখা যাবে না এবং উত্তরের মাঝে মাত্রাতিরিক্ত ফাঁকা লাইন দেওয়া যাবে না।
+    নির্দেশ: ফাইল থেকে তথ্য নিয়ে প্রশ্ন ও উত্তর তৈরি করো। প্রতিটি প্রশ্নের শেষে অবশ্যই (পৃষ্ঠা-X, অনুচ্ছেদ-Y, লাইন-Z) রেফারেন্স দাও। কোনো 'ধাপ' লেবেল ব্যবহার করবে না।
   `;
 
   const parts = files.map(file => ({
@@ -95,8 +90,8 @@ export const generateQuestionsFromImages = async (
     incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error: any) {
-    console.error("Gemini Generation Error:", error);
-    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে: ' + (error.message || 'Unknown error'));
+    console.error("Generation Error:", error);
+    throw new Error('AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
   }
 };
 
@@ -108,9 +103,7 @@ export const solveAnyQuery = async (
   userId: string = "guest"
 ): Promise<string> => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === '') {
-    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
-  }
+  if (!apiKey) throw new Error('API Key missing.');
 
   const ai = new GoogleGenAI({ apiKey });
   const systemPrompt = getDynamicInstruction(mode, subject);
@@ -119,7 +112,7 @@ export const solveAnyQuery = async (
     ${systemPrompt}
     বিষয়: ${subject}
     ব্যবহারকারীর জিজ্ঞাসা: "${query}"
-    নির্দেশ: উত্তরটি রেফারেন্স (পৃষ্ঠা, অনুচ্ছেদ, লাইন) সহ নিখুঁতভাবে তৈরি করো। কোনো 'ধাপ ১', 'ধাপ ২' ব্যবহার করবে না এবং লাইনের মাঝে অতিরিক্ত স্পেস বা গ্যাপ দেবে না।
+    নির্দেশ: উত্তরটি রেফারেন্স সহ নিখুঁতভাবে তৈরি করো। কোনো 'ধাপ' লেবেল ব্যবহার করবে না।
   `;
 
   const parts: any[] = [];
@@ -144,8 +137,8 @@ export const solveAnyQuery = async (
     incrementUsage(userId);
     return cleanResponse(response.text || '');
   } catch (error: any) {
-    console.error("Gemini Solve Error:", error);
-    throw new Error('সমাধান জেনারেট করা সম্ভব হয়নি: ' + (error.message || 'Unknown error'));
+    console.error("Solve Error:", error);
+    throw new Error('সমাধান পাওয়া যায়নি।');
   }
 };
 
@@ -159,7 +152,6 @@ const cleanResponse = (text: string): string => {
     .replace(/Step\s*[0-9]+\s*[:।-]\s*/gi, '')   
     .replace(/\r/g, '')
     .replace(/\n{3,}/g, '\n\n') 
-    .replace(/^\s+$/gm, '') 
     .replace(/\*/g, '×') 
     .trim();
 };
