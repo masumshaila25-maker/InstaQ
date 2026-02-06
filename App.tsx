@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { QuestionType, QuestionRequest, QuestionConfig, GenerationResult, FilePart, AppMode, SubjectType, ChatMessage, User } from './types';
 import { generateQuestionsFromImages, solveAnyQuery } from './services/geminiService';
@@ -37,6 +36,7 @@ const App: React.FC = () => {
   const [activeChatLog, setActiveChatLog] = useState<ChatMessage[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('সম্পন্ন হয়েছে!');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,9 +96,11 @@ const App: React.FC = () => {
   }, [activeChatLog, loading]);
 
   // Utility functions
-  const triggerToast = (msg: string) => {
-    setToastMsg(msg); setShowToast(true);
-    setTimeout(() => setShowToast(false), 2500);
+  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg(msg); 
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   const formatTime = (isoString: string) => {
@@ -158,14 +160,10 @@ const App: React.FC = () => {
     if (!user || loading) return;
     
     if (appMode === AppMode.GENERATE && uploadedFiles.length === 0) {
-      triggerToast('প্রশ্নপত্র তৈরির জন্য ছবি আপলোড প্রয়োজন');
+      triggerToast('ছবি আপলোড করুন', 'error');
       return;
     }
-    if (appMode === AppMode.SEARCH && !userQuery.trim() && uploadedFiles.length === 0) {
-      triggerToast('দয়া করে আপনার প্রশ্ন লিখুন অথবা ছবি দিন');
-      return;
-    }
-
+    
     setLoading(true);
     try {
       let content = '';
@@ -187,10 +185,10 @@ const App: React.FC = () => {
       };
       setResult(newRes); 
       setHistory(prev => [newRes, ...prev]);
-      triggerToast('ফলাফল জেনারেট হয়েছে');
+      triggerToast('সাফল্যজনকভাবে জেনারেট হয়েছে');
     } catch (err: any) { 
-      console.error("Generation Error Details:", err);
-      triggerToast('জেনারেট করতে সমস্যা হয়েছে: ' + (err.message || 'Unknown Error')); 
+      console.error("Main Action Error:", err);
+      triggerToast(err.message || 'জেনারেট করতে সমস্যা হয়েছে', 'error'); 
     } finally { 
       setLoading(false); 
     }
@@ -200,12 +198,10 @@ const App: React.FC = () => {
     if (e) e.preventDefault();
     if (!user || loading) return;
 
-    const finalQuery = manualQuery || chatInput;
-    if (!finalQuery.trim() && chatAttachments.length === 0) return;
+    const query = manualQuery || chatInput;
+    if (!query.trim() && chatAttachments.length === 0) return;
     
-    const query = finalQuery; 
     const attachments = [...chatAttachments];
-    
     setChatInput(''); 
     setChatAttachments([]);
     setLoading(true);
@@ -220,28 +216,26 @@ const App: React.FC = () => {
       const finalLog = [...updatedLog, newAiMsg];
       setActiveChatLog(finalLog);
 
-      if (result && result.mode === AppMode.CHAT) {
-        const updatedResult = { ...result, chatLog: finalLog, timestamp: new Date().toISOString() };
-        setResult(updatedResult);
-        setHistory(prev => prev.map(h => h.id === result.id ? updatedResult : h));
+      const chatResult: GenerationResult = {
+        id: result?.mode === AppMode.CHAT ? result.id : Date.now().toString(),
+        userId: user.id,
+        content: response,
+        timestamp: new Date().toISOString(),
+        imageCount: attachments.length,
+        mode: AppMode.CHAT,
+        subject: selectedSubject,
+        userQuestion: query || undefined,
+        chatLog: finalLog
+      };
+      setResult(chatResult);
+      if (result?.mode === AppMode.CHAT) {
+        setHistory(prev => prev.map(h => h.id === chatResult.id ? chatResult : h));
       } else {
-        const newChatRes: GenerationResult = {
-          id: Date.now().toString(),
-          userId: user.id,
-          content: response,
-          timestamp: new Date().toISOString(),
-          imageCount: attachments.length,
-          mode: AppMode.CHAT,
-          subject: selectedSubject,
-          userQuestion: query || undefined,
-          chatLog: finalLog
-        };
-        setResult(newChatRes);
-        setHistory(prev => [newChatRes, ...prev]);
+        setHistory(prev => [chatResult, ...prev]);
       }
     } catch (err: any) { 
-      console.error("Chat Error Details:", err);
-      triggerToast('AI থেকে উত্তর পেতে সমস্যা হয়েছে'); 
+      console.error("Chat Error:", err);
+      triggerToast(err.message || 'AI থেকে উত্তর পেতে সমস্যা হয়েছে', 'error'); 
     } finally { 
       setLoading(false); 
     }
@@ -252,7 +246,7 @@ const App: React.FC = () => {
     setActiveChatLog([]);
     setChatAttachments([]);
     setChatInput('');
-    triggerToast('নতুন চ্যাট শুরু হয়েছে');
+    triggerToast('নতুন চ্যাট সেশন শুরু হয়েছে');
   };
 
   const handlePaste = (e: React.ClipboardEvent, target: 'main' | 'chat') => {
@@ -281,7 +275,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Improved Unified Export Function - Fixed Black Page Issue
   const exportContent = async (text: string, format: 'copy' | 'pdf' | 'word' | 'image') => {
     if (!text || exporting) return;
     
@@ -291,7 +284,7 @@ const App: React.FC = () => {
         triggerToast('কপি করা হয়েছে');
         return;
       } catch (err) {
-        triggerToast('কপি করা সম্ভব হয়নি');
+        triggerToast('কপি সম্ভব হয়নি', 'error');
         return;
       }
     }
@@ -305,69 +298,38 @@ const App: React.FC = () => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob); 
       link.download = `InstaQ_${Date.now()}.doc`; 
-      document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
       setExporting(false);
       return;
     }
 
     const container = document.getElementById('export-container');
     if (container) {
-      // Clear and populate
       container.innerText = text;
-      
-      // Critical: Ensure the container is temporarily visible for capture engines
-      // but still hidden from user via opacity and z-index already set in CSS.
-      // We also wait a moment for the DOM to update.
-      await new Promise(r => setTimeout(r, 1000));
-      
-      // Ensure fonts are fully ready
-      if ((document as any).fonts) await (document as any).fonts.ready;
+      await new Promise(r => setTimeout(r, 800));
       
       try {
-        // High quality scale for crisp text, with explicit white background
-        const dataUrl = await toPng(container, { 
-          backgroundColor: '#ffffff', 
-          pixelRatio: 2, // 2 is usually enough and more stable
-          cacheBust: true,
-          style: {
-            opacity: '1',
-            zIndex: '9999'
-          }
-        });
-
-        if (!dataUrl || dataUrl === 'data:,') {
-          throw new Error("Empty image generated");
-        }
-
+        const dataUrl = await toPng(container, { backgroundColor: '#ffffff', pixelRatio: 2 });
         if (format === 'image') {
           const l = document.createElement('a'); 
           l.download = `InstaQ_${Date.now()}.png`; 
           l.href = dataUrl; 
-          document.body.appendChild(l);
           l.click();
-          document.body.removeChild(l);
         } else {
           const pdf = new jsPDF('p', 'mm', 'a4');
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const imgProps = pdf.getImageProperties(dataUrl);
           const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          
           pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
           pdf.save(`InstaQ_${Date.now()}.pdf`);
         }
         triggerToast('ডাউনলোড সম্পন্ন হয়েছে');
       } catch (e) { 
-        console.error("Export Error:", e);
-        triggerToast('রপ্তানিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।'); 
+        triggerToast('রপ্তানিতে সমস্যা হয়েছে', 'error'); 
       } finally { 
         container.innerText = ""; 
         setExporting(false);
       }
-    } else {
-      setExporting(false);
-      triggerToast('এক্সপোর্ট ইঞ্জিন কাজ করছে না');
     }
   };
 
@@ -395,7 +357,14 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfd]" onPaste={(e) => appMode !== AppMode.CHAT && handlePaste(e, 'main')}>
-      {showToast && <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] animate-entry"><div className="bg-slate-900/90 backdrop-blur-md text-white px-8 py-3.5 rounded-full shadow-2xl flex items-center gap-3"><i className="fas fa-check-circle text-emerald-400"></i><span className="text-sm font-bold">{toastMsg}</span></div></div>}
+      {showToast && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] animate-entry">
+          <div className={`backdrop-blur-md text-white px-8 py-3.5 rounded-full shadow-2xl flex items-center gap-3 ${toastType === 'success' ? 'bg-slate-900/90' : 'bg-red-600/90'}`}>
+            <i className={`fas ${toastType === 'success' ? 'fa-check-circle text-emerald-400' : 'fa-exclamation-circle text-white'}`}></i>
+            <span className="text-sm font-bold">{toastMsg}</span>
+          </div>
+        </div>
+      )}
 
       <nav className="sticky top-0 z-40 glass h-20 px-6 lg:px-12 flex items-center justify-between">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setAppMode(AppMode.GENERATE)}>
@@ -527,18 +496,6 @@ const App: React.FC = () => {
                     </section>
                   )}
 
-                  {appMode === AppMode.GENERATE && (
-                    <section className="modern-card p-8 rounded-[2.5rem]">
-                      <h3 className="font-black text-slate-800 text-xs mb-4 flex items-center gap-3"><i className="fas fa-comment-dots text-indigo-500"></i> বিশেষ নির্দেশ (কমান্ড)</h3>
-                      <textarea 
-                        value={customGenPrompt} 
-                        onChange={e => setCustomGenPrompt(e.target.value)} 
-                        className="w-full bg-slate-50 border border-slate-100 rounded-[2rem] p-6 text-sm font-medium outline-none h-32 focus:bg-white focus:ring-4 focus:ring-indigo-100 transition-all placeholder:text-slate-300" 
-                        placeholder="যেমন: ৩য় অধ্যায় থেকে প্রশ্ন করুন, অথবা প্রশ্নের মান কঠিন করুন..." 
-                      />
-                    </section>
-                  )}
-
                   <section className="modern-card p-8 rounded-[2.5rem]">
                     <h3 className="font-black text-slate-800 text-xs mb-4">ছবি আপলোড</h3>
                     <div onClick={() => fileInputRef.current?.click()} className="group border-2 border-dashed border-slate-200 bg-slate-50 rounded-[2rem] p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-white transition-all">
@@ -564,7 +521,7 @@ const App: React.FC = () => {
                   </section>
 
                   <button onClick={handleMainAction} disabled={loading} className="w-full py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-4 active:scale-95 disabled:opacity-50">
-                    {loading ? <TypingIndicator label="AI প্রসেসিং করছে..." /> : <><i className="fas fa-sparkles"></i> শুরু করুন</>}
+                    {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-sparkles"></i> শুরু করুন</>}
                   </button>
                 </div>
               )}
@@ -641,7 +598,7 @@ const App: React.FC = () => {
                         <button 
                           onClick={(e) => handleChatSolve(e)} 
                           disabled={loading || (!chatInput.trim() && chatAttachments.length === 0)} 
-                          className="w-12 h-12 flex-shrink-0 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-all self-end mb-1"
+                          className="w-12 h-12 flex-shrink-0 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 disabled:opacity-50 transition-all self-end mb-1"
                         >
                           {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-paper-plane"></i>}
                         </button>
@@ -664,8 +621,8 @@ const App: React.FC = () => {
                   </header>
                   <div className="flex-grow p-12 overflow-y-auto custom-scrollbar">
                     {loading ? (
-                      <div className="h-full flex flex-col items-center justify-center space-y-8 animate-pulse">
-                        <TypingIndicator label="AI রেফারেন্স খুঁজে বের করছে এবং কন্টেন্ট লিখছে..." />
+                      <div className="h-full flex flex-col items-center justify-center space-y-8">
+                        <TypingIndicator label="AI রেফারেন্স খুঁজে বের করছে..." />
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">দয়া করে অপেক্ষা করুন</p>
                       </div>
                     ) : result ? (

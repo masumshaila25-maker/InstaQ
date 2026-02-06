@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import process from 'node:process';
 
 export default defineConfig(({ mode }) => {
-  // লোড এনভায়রনমেন্ট ভ্যারিয়েবল (বিল্ড টাইমে Vercel থেকে API_KEY নেওয়ার জন্য)
   const env = loadEnv(mode, process.cwd(), '');
   const apiKey = env.API_KEY || process.env.API_KEY || '';
   
@@ -17,7 +16,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: false
+      sourcemap: false,
+      minify: 'terser'
     }
   };
 });

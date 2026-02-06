@@ -56,7 +56,7 @@ export const generateQuestionsFromImages = async (
   userId: string = "guest"
 ): Promise<string> => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error('API Key missing. Please ensure API_KEY is set in Vercel environment variables.');
+  if (!apiKey) throw new Error('API Key পাওয়া যায়নি। Vercel এ API_KEY সেট করা আছে কিনা নিশ্চিত করুন।');
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -70,10 +70,10 @@ export const generateQuestionsFromImages = async (
     বিষয়: ${subject}
     প্রশ্নের ধরণ: ${typesDetails}
     ব্যবহারকারীর বিশেষ নির্দেশ: ${customPrompt || "বইয়ের তথ্য অনুযায়ী নিখুঁত প্রশ্ন ও উত্তর তৈরি করো।"}
-    নির্দেশ: ফাইল থেকে তথ্য নিয়ে প্রশ্ন ও উত্তর তৈরি করো। প্রতিটি প্রশ্নের শেষে অবশ্যই (পৃষ্ঠা-X, অনুচ্ছেদ-Y, লাইন-Z) রেফারেন্স দাও। কোনো 'ধাপ' লেবেল ব্যবহার করবে না।
+    নির্দেশ: ফাইল থেকে তথ্য নিয়ে প্রশ্ন ও উত্তর তৈরি করো। প্রতিটি প্রশ্নের শেষে অবশ্যই রেফারেন্স দাও।
   `;
 
-  const parts = files.map(file => ({
+  const imageParts = files.map(file => ({
     inlineData: { 
       mimeType: file.mimeType, 
       data: file.data.includes(',') ? file.data.split(',')[1] : file.data 
@@ -87,13 +87,13 @@ export const generateQuestionsFromImages = async (
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: [{ parts: [...parts, { text: prompt }] }],
+      contents: { parts: [...imageParts, { text: prompt }] },
     });
     
     incrementUsage(userId);
-    return cleanResponse(response.text || '');
+    return cleanResponse(response.text || 'AI থেকে কোনো উত্তর পাওয়া যায়নি।');
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini Generation Error:", error);
     throw new Error(error.message || 'AI প্রসেসিং করতে ব্যর্থ হয়েছে।');
   }
 };
@@ -115,7 +115,6 @@ export const solveAnyQuery = async (
     ${systemPrompt}
     বিষয়: ${subject}
     ব্যবহারকারীর জিজ্ঞাসা: "${query}"
-    নির্দেশ: উত্তরটি রেফারেন্স সহ নিখুঁতভাবে তৈরি করো। কোনো 'ধাপ' লেবেল ব্যবহার করবে না।
   `;
 
   const parts: any[] = [];
@@ -138,14 +137,14 @@ export const solveAnyQuery = async (
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: [{ parts }],
+      contents: { parts },
     });
     
     incrementUsage(userId);
-    return cleanResponse(response.text || '');
+    return cleanResponse(response.text || 'কোনো সমাধান পাওয়া যায়নি।');
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    throw new Error('সমাধান পাওয়া যায়নি।');
+    console.error("Gemini Solve Error:", error);
+    throw new Error(error.message || 'AI থেকে উত্তর পেতে সমস্যা হয়েছে।');
   }
 };
 
