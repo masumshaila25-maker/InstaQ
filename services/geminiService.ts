@@ -59,8 +59,12 @@ export const generateQuestionsFromImages = async (
   customPrompt: string = "",
   userId: string = "guest"
 ): Promise<string> => {
-  // Always use direct process.env.API_KEY when initializing the GoogleGenAI client instance
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === '') {
+    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে Vercel ড্যাশবোর্ডের Settings > Environment Variables চেক করুন এবং রি-ডিপ্লয় করুন।');
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const typesDetails = Object.entries(request)
     .filter(([_, config]) => config.enabled)
@@ -79,7 +83,6 @@ export const generateQuestionsFromImages = async (
     inlineData: { mimeType: file.mimeType, data: file.data.split(',')[1] || file.data },
   }));
 
-  // Select model based on task complexity (Math and Science subjects use the Pro model)
   const modelName = (subject === SubjectType.MATH || subject === SubjectType.SCIENCE) 
     ? 'gemini-3-pro-preview' 
     : 'gemini-3-flash-preview';
@@ -90,7 +93,6 @@ export const generateQuestionsFromImages = async (
       contents: { parts: [...parts, { text: prompt }] },
     });
     incrementUsage(userId);
-    // Access generated text directly via the .text property
     return cleanResponse(response.text || '');
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
@@ -105,9 +107,12 @@ export const solveAnyQuery = async (
   mode: string,
   userId: string = "guest"
 ): Promise<string> => {
-  // Always use direct process.env.API_KEY when initializing the GoogleGenAI client instance
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === '') {
+    throw new Error('এপিআই কি (API Key) পাওয়া যায়নি।');
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const systemPrompt = getDynamicInstruction(mode, subject);
   
   const prompt = `
@@ -127,7 +132,6 @@ export const solveAnyQuery = async (
   }
   parts.push({ text: prompt });
 
-  // Select model based on task complexity (Math and Science subjects use the Pro model)
   const modelName = (subject === SubjectType.MATH || subject === SubjectType.SCIENCE) 
     ? 'gemini-3-pro-preview' 
     : 'gemini-3-flash-preview';
@@ -138,7 +142,6 @@ export const solveAnyQuery = async (
       contents: { parts },
     });
     incrementUsage(userId);
-    // Access generated text directly via the .text property
     return cleanResponse(response.text || '');
   } catch (error: any) {
     console.error("Gemini Solve Error:", error);
